@@ -1,0 +1,7 @@
+apiVersion: knative.dev/v1alpha1
+kind: KnativeEventingSources
+metadata:
+  name: example-knativeeventingsources
+spec:
+  # Add fields here
+  size: 3
