@@ -43,5 +43,6 @@ rules:
   resources:
   - '*'
   - knativeeventingsources
+  - knativeistios
   verbs:
   - '*'

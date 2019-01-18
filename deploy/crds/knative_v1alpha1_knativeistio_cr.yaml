@@ -1,0 +1,7 @@
+apiVersion: knative.dev/v1alpha1
+kind: KnativeIstio
+metadata:
+  name: example-knativeistio
+spec:
+  # Add fields here
+  size: 3
