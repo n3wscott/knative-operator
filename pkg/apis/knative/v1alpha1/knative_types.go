@@ -4,15 +4,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 /*
 
 Planning:
 
 spec.serving
+ - version
 spec.eventing
+ - version
+spec.build
+ - version
+
+
+- todo: customDomain
 
 
 
@@ -21,13 +25,32 @@ spec.eventing
 
 // KnativeSpec defines the desired state of Knative
 type KnativeSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	Serving ServingSpec `json:"serving,omitempty"`
+	Eventing EventingSpec `json:"eventing,omitempty"`
+	Build BuildSpec `json:"build,omitempty"`
+
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 }
 
+// ServingSpec the spec for Serving specific installation configuration.
+type ServingSpec struct {
+	Version string `json:"version,omitempty"`
+}
+
+// EventingSpec the spec for Eventing specific installation configuration.
+type EventingSpec struct {
+	Version string `json:"version,omitempty"`
+}
+
+// BuildSpec the spec for Build specific installation configuration.
+type BuildSpec struct {
+	Version string `json:"version,omitempty"`
+}
+
+
 // KnativeStatus defines the observed state of Knative
 type KnativeStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// TODO: INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 }
 
