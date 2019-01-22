@@ -6,6 +6,7 @@ import (
 	"github.com/ghodss/yaml"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"os"
+	"strings"
 )
 
 //
@@ -144,26 +145,27 @@ func main() {
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		fmt.Println(scanner.Text())
+		//fmt.Println(scanner.Text())
 
 		l := scanner.Text()
+		if strings.HasPrefix("#", strings.TrimSpace(l)) {
+			continue
+		}
 		if l == "---" {
 			u := unstructured.Unstructured{}
 			err = yaml.Unmarshal(obj, &u)
 			if err != nil {
-				fmt.Print(err)
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				fmt.Printf("\nUnstructured: %+v\n", u)
 			}
-			fmt.Printf("Unstructured: %v\n", u)
 
 			// clean
 			obj = []byte{}
 		} else {
 			obj = append(obj, scanner.Bytes()...)
+			obj = append(obj, []byte("\n")...)
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		fmt.Print(err)
 	}
 
 	//b1 := make([]byte, 5)
