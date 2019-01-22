@@ -2,13 +2,17 @@ package knativeistio
 
 import (
 	"context"
-
+	duckapis "github.com/knative/pkg/apis"
 	knativev1alpha1 "github.com/n3wscott/knative-operator/pkg/apis/knative/v1alpha1"
+	"github.com/n3wscott/knative-operator/pkg/yaml"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -70,8 +74,155 @@ var _ reconcile.Reconciler = &ReconcileKnativeIstio{}
 type ReconcileKnativeIstio struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
+	client        client.Client
+	scheme        *runtime.Scheme
+	dynamicClient dynamic.Interface
+
+	crds *yaml.ConfigFile
+	core *yaml.ConfigFile
+}
+
+const (
+	CRDS_CONFIG_FILE_PATH = "/etc/config/istio-crds-v0.3.0.yaml"
+	CORE_CONFIG_FILE_PATH = "/etc/config/istio-v0.3.0.yaml"
+)
+
+func (r *ReconcileKnativeIstio) InjectConfig(c *rest.Config) error {
+	var err error
+	r.dynamicClient, err = dynamic.NewForConfig(c)
+	return err
+}
+
+func (r *ReconcileKnativeIstio) UpdateConfig() {
+	if r.crds == nil {
+		r.crds = &yaml.ConfigFile{
+			Path: CRDS_CONFIG_FILE_PATH,
+		}
+		if err := r.crds.Read(); err != nil {
+			log.Error(err, "error reading config file %q", r.crds.Path)
+		}
+	}
+	logger := log.WithValues("Config", r.crds.Path)
+	logger.Info("Updated CRD Config", "ConfigMap.Istio.Resources", len(r.crds.Resources))
+}
+
+func (r *ReconcileKnativeIstio) UpdateCore() {
+	if r.core == nil {
+		r.core = &yaml.ConfigFile{
+			Path: CORE_CONFIG_FILE_PATH,
+		}
+		if err := r.core.Read(); err != nil {
+			log.Error(err, "error reading config file %q", r.core.Path)
+		}
+	}
+	logger := log.WithValues("Config", r.core.Path)
+	logger.Info("Updated Core Config", "ConfigMap.Istio.Resources", len(r.core.Resources))
+}
+
+func (r *ReconcileKnativeIstio) ReconcileIstioCRDs(request reconcile.Request) error {
+	logger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	logger.Info("Reconciling Knative Istio CRDs")
+
+	for k, v := range r.crds.Resources {
+		logger.Info("inspecting resource", "Reconcile.Istio.ResourceKey", k)
+
+		kind := v.GetKind()
+
+		vers := v.GetAPIVersion()
+
+		gv, err := schema.ParseGroupVersion(vers)
+		if err != nil {
+			return err
+		}
+
+		gvk := gv.WithKind(kind)
+
+		gvr := duckapis.KindToResource(gvk)
+
+		gvrClient := r.dynamicClient.Resource(gvr)
+
+		name := v.GetName()
+		namespace := v.GetNamespace()
+
+		var gvrC dynamic.ResourceInterface
+
+		if namespace == "" {
+			gvrC = gvrClient
+		} else {
+			gvrC = gvrClient.Namespace(namespace)
+		}
+
+		_, err = gvrC.Get(name, metav1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				logger.Info("need to create resource", "Reconcile.Istio.NeedCreation", k)
+
+				_, err := gvrC.Create(&v, metav1.CreateOptions{})
+				if err != nil {
+					logger.Error(err, "failed to create")
+				}
+
+			} else {
+				return err
+			}
+			continue
+		}
+		logger.Info("resource valid", "Reconcile.Istio.Resource.Exists", k)
+	}
+	return nil
+}
+
+func (r *ReconcileKnativeIstio) ReconcileIstioCore(request reconcile.Request) error {
+	logger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	logger.Info("Reconciling Knative Istio Core")
+
+	for k, v := range r.core.Resources {
+		logger.Info("inspecting resource", "Reconcile.Istio.ResourceKey", k)
+
+		kind := v.GetKind()
+
+		vers := v.GetAPIVersion()
+
+		gv, err := schema.ParseGroupVersion(vers)
+		if err != nil {
+			return err
+		}
+
+		gvk := gv.WithKind(kind)
+
+		gvr := duckapis.KindToResource(gvk)
+
+		gvrClient := r.dynamicClient.Resource(gvr)
+
+		name := v.GetName()
+		namespace := v.GetNamespace()
+
+		var gvrC dynamic.ResourceInterface
+
+		if namespace == "" {
+			gvrC = gvrClient
+		} else {
+			gvrC = gvrClient.Namespace(namespace)
+		}
+
+		_, err = gvrC.Get(name, metav1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				logger.Info("need to create resource", "Reconcile.Istio.NeedCreation", k)
+
+				_, err := gvrC.Create(&v, metav1.CreateOptions{})
+				if err != nil {
+					logger.Error(err, "failed to create")
+				}
+				continue
+			} else {
+				logger.Error(err, "failed to get")
+				continue
+			}
+		}
+		logger.Info("resource valid", "Reconcile.Istio.Resource.Exists", k)
+	}
+	return nil
 }
 
 // Reconcile reads that state of the cluster for a KnativeIstio object and makes changes based on the state read
@@ -85,10 +236,20 @@ func (r *ReconcileKnativeIstio) Reconcile(request reconcile.Request) (reconcile.
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling KnativeIstio")
 
+	r.UpdateConfig()
+
+	if err := r.ReconcileIstioCRDs(request); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	r.UpdateCore()
+	if err := r.ReconcileIstioCore(request); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// Fetch the KnativeIstio instance
 	instance := &knativev1alpha1.KnativeIstio{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
-	if err != nil {
+	if err := r.client.Get(context.TODO(), request.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -109,7 +270,7 @@ func (r *ReconcileKnativeIstio) Reconcile(request reconcile.Request) (reconcile.
 
 	// Check if this Pod already exists
 	found := &corev1.Pod{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
 		err = r.client.Create(context.TODO(), pod)

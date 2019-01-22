@@ -225,6 +225,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:8f2f8f17119afa9e3ef9718447b30dbc389477abdb925b0ec3a9c5dab6183d17"
+  name = "github.com/knative/pkg"
+  packages = ["apis"]
+  pruneopts = "NT"
+  revision = "a330baa9b0000d11a3d127a177934252413f344f"
+
+[[projects]]
+  branch = "master"
   digest = "1:7d9fcac7f1228470c4ea0ee31cdfb662a758c44df691e39b3e76c11d3e12ba8f"
   name = "github.com/mailru/easyjson"
   packages = [
@@ -566,6 +574,7 @@
   digest = "1:868de7cbaa0ecde6dc231c1529a10ae01bb05916095c0c992186e2a5cac57e79"
   name = "k8s.io/apimachinery"
   packages = [
+    "pkg/api/equality",
     "pkg/api/errors",
     "pkg/api/meta",
     "pkg/api/resource",
@@ -801,6 +810,8 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/ghodss/yaml",
+    "github.com/knative/pkg/apis",
     "github.com/operator-framework/operator-sdk/pkg/k8sutil",
     "github.com/operator-framework/operator-sdk/pkg/leader",
     "github.com/operator-framework/operator-sdk/version",
@@ -808,11 +819,14 @@
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
+    "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/types",
+    "k8s.io/client-go/dynamic",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
+    "k8s.io/client-go/rest",
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/conversion-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
