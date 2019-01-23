@@ -2,6 +2,9 @@ package knative
 
 import (
 	"context"
+	"github.com/n3wscott/knative-operator/pkg/yaml"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 
 	knativev1alpha1 "github.com/n3wscott/knative-operator/pkg/apis/knative/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -70,8 +73,34 @@ var _ reconcile.Reconciler = &ReconcileKnative{}
 type ReconcileKnative struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
+	client        client.Client
+	scheme        *runtime.Scheme
+	dynamicClient dynamic.Interface
+
+	serving *yaml.ConfigFile
+}
+
+const (
+	SERVING_CONFIG_FILE_PATH = "/etc/config/knative/serving-v0.3.0.yaml"
+)
+
+func (r *ReconcileKnative) InjectConfig(c *rest.Config) error {
+	var err error
+	r.dynamicClient, err = dynamic.NewForConfig(c)
+	return err
+}
+
+func (r *ReconcileKnative) UpdateConfig() {
+	if r.serving == nil {
+		r.serving = &yaml.ConfigFile{
+			Path: SERVING_CONFIG_FILE_PATH,
+		}
+		if err := r.serving.Read(); err != nil {
+			log.Error(err, "error reading config file %q", r.serving.Path)
+		}
+	}
+	logger := log.WithValues("Config", r.serving.Path)
+	logger.Info("Updated Serving Config", "ConfigMap.Knative.Resources", len(r.serving.Resources))
 }
 
 // Reconcile reads that state of the cluster for a Knative object and makes changes based on the state read
@@ -96,6 +125,11 @@ func (r *ReconcileKnative) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
+	}
+
+	r.UpdateConfig()
+	if err := yaml.ReconcileConfig(r.serving, request, r.dynamicClient); err != nil {
 		return reconcile.Result{}, err
 	}
 

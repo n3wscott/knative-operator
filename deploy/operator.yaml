@@ -33,7 +33,9 @@ spec:
               value: "knative-operator"
           volumeMounts:
             - name: istio-crds-yaml-v0-3-0-volume
-              mountPath: /etc/config
+              mountPath: /etc/config/istio
+            - name: knative-install-v0-3-0-yaml-volume
+              mountPath: /etc/config/knative
       volumes:
         - name: istio-crds-yaml-v0-3-0-volume
           configMap:
@@ -43,3 +45,10 @@ spec:
                 path: istio-crds-v0.3.0.yaml
               - key: istio-v0.3.0.yaml
                 path: istio-v0.3.0.yaml
+        - name: knative-install-v0-3-0-yaml-volume
+          configMap:
+            name: knative-install-yaml
+            items:
+              - key: serving-v0.3.0.yaml
+                path: serving-v0.3.0.yaml
+

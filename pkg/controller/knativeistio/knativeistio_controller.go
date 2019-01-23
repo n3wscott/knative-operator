@@ -2,14 +2,12 @@ package knativeistio
 
 import (
 	"context"
-	duckapis "github.com/knative/pkg/apis"
 	knativev1alpha1 "github.com/n3wscott/knative-operator/pkg/apis/knative/v1alpha1"
 	"github.com/n3wscott/knative-operator/pkg/yaml"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -83,8 +81,8 @@ type ReconcileKnativeIstio struct {
 }
 
 const (
-	CRDS_CONFIG_FILE_PATH = "/etc/config/istio-crds-v0.3.0.yaml"
-	CORE_CONFIG_FILE_PATH = "/etc/config/istio-v0.3.0.yaml"
+	CRDS_CONFIG_FILE_PATH = "/etc/config/istio/istio-crds-v0.3.0.yaml"
+	CORE_CONFIG_FILE_PATH = "/etc/config/istio/istio-v0.3.0.yaml"
 )
 
 func (r *ReconcileKnativeIstio) InjectConfig(c *rest.Config) error {
@@ -119,112 +117,6 @@ func (r *ReconcileKnativeIstio) UpdateCore() {
 	logger.Info("Updated Core Config", "ConfigMap.Istio.Resources", len(r.core.Resources))
 }
 
-func (r *ReconcileKnativeIstio) ReconcileIstioCRDs(request reconcile.Request) error {
-	logger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	logger.Info("Reconciling Knative Istio CRDs")
-
-	for k, v := range r.crds.Resources {
-		logger.Info("inspecting resource", "Reconcile.Istio.ResourceKey", k)
-
-		kind := v.GetKind()
-
-		vers := v.GetAPIVersion()
-
-		gv, err := schema.ParseGroupVersion(vers)
-		if err != nil {
-			return err
-		}
-
-		gvk := gv.WithKind(kind)
-
-		gvr := duckapis.KindToResource(gvk)
-
-		gvrClient := r.dynamicClient.Resource(gvr)
-
-		name := v.GetName()
-		namespace := v.GetNamespace()
-
-		var gvrC dynamic.ResourceInterface
-
-		if namespace == "" {
-			gvrC = gvrClient
-		} else {
-			gvrC = gvrClient.Namespace(namespace)
-		}
-
-		_, err = gvrC.Get(name, metav1.GetOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				logger.Info("need to create resource", "Reconcile.Istio.NeedCreation", k)
-
-				_, err := gvrC.Create(&v, metav1.CreateOptions{})
-				if err != nil {
-					logger.Error(err, "failed to create")
-				}
-
-			} else {
-				return err
-			}
-			continue
-		}
-		logger.Info("resource valid", "Reconcile.Istio.Resource.Exists", k)
-	}
-	return nil
-}
-
-func (r *ReconcileKnativeIstio) ReconcileIstioCore(request reconcile.Request) error {
-	logger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	logger.Info("Reconciling Knative Istio Core")
-
-	for k, v := range r.core.Resources {
-		logger.Info("inspecting resource", "Reconcile.Istio.ResourceKey", k)
-
-		kind := v.GetKind()
-
-		vers := v.GetAPIVersion()
-
-		gv, err := schema.ParseGroupVersion(vers)
-		if err != nil {
-			return err
-		}
-
-		gvk := gv.WithKind(kind)
-
-		gvr := duckapis.KindToResource(gvk)
-
-		gvrClient := r.dynamicClient.Resource(gvr)
-
-		name := v.GetName()
-		namespace := v.GetNamespace()
-
-		var gvrC dynamic.ResourceInterface
-
-		if namespace == "" {
-			gvrC = gvrClient
-		} else {
-			gvrC = gvrClient.Namespace(namespace)
-		}
-
-		_, err = gvrC.Get(name, metav1.GetOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				logger.Info("need to create resource", "Reconcile.Istio.NeedCreation", k)
-
-				_, err := gvrC.Create(&v, metav1.CreateOptions{})
-				if err != nil {
-					logger.Error(err, "failed to create")
-				}
-				continue
-			} else {
-				logger.Error(err, "failed to get")
-				continue
-			}
-		}
-		logger.Info("resource valid", "Reconcile.Istio.Resource.Exists", k)
-	}
-	return nil
-}
-
 // Reconcile reads that state of the cluster for a KnativeIstio object and makes changes based on the state read
 // and what is in the KnativeIstio.Spec
 // TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
@@ -237,13 +129,12 @@ func (r *ReconcileKnativeIstio) Reconcile(request reconcile.Request) (reconcile.
 	reqLogger.Info("Reconciling KnativeIstio")
 
 	r.UpdateConfig()
-
-	if err := r.ReconcileIstioCRDs(request); err != nil {
+	if err := yaml.ReconcileConfig(r.crds, request, r.dynamicClient); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	r.UpdateCore()
-	if err := r.ReconcileIstioCore(request); err != nil {
+	if err := yaml.ReconcileConfig(r.core, request, r.dynamicClient); err != nil {
 		return reconcile.Result{}, err
 	}
 

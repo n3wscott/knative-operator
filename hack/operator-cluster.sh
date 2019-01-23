@@ -10,3 +10,4 @@ source $(dirname $0)/exports.sh
 
 # echo Pointing to:
 kubectl config current-context
+
