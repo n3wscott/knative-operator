@@ -83,6 +83,8 @@ type ReconcileKnativeIstio struct {
 const (
 	CRDS_CONFIG_FILE_PATH = "/etc/config/istio/istio-crds-v0.3.0.yaml"
 	CORE_CONFIG_FILE_PATH = "/etc/config/istio/istio-v0.3.0.yaml"
+
+	DEFAULT_NAMESPACE = "default"
 )
 
 func (r *ReconcileKnativeIstio) InjectConfig(c *rest.Config) error {
@@ -138,6 +140,30 @@ func (r *ReconcileKnativeIstio) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err
 	}
 
+	// Update namespace to have istio label.
+	// kubectl label namespace default istio-injection=enabled
+
+	namespace := &corev1.Namespace{}
+	err := r.client.Get(context.TODO(), client.ObjectKey{Name: DEFAULT_NAMESPACE}, namespace)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// TODO make the namespace
+		}
+		reqLogger.Error(err, "failed to get namespace", "Namespace", DEFAULT_NAMESPACE)
+	} else {
+		if namespace.Labels == nil {
+			namespace.Labels = make(map[string]string)
+		}
+		v, ok := namespace.Labels["istio-injection"]
+		if !ok || v != "enabled" {
+			namespace.Labels["istio-injection"] = "enabled"
+			err := r.client.Update(context.TODO(), namespace)
+			if err != nil {
+				reqLogger.Error(err, "failed to update namespace", "Namespace", DEFAULT_NAMESPACE)
+			}
+		}
+	}
+
 	// Fetch the KnativeIstio instance
 	instance := &knativev1alpha1.KnativeIstio{}
 	if err := r.client.Get(context.TODO(), request.NamespacedName, instance); err != nil {
@@ -161,7 +187,7 @@ func (r *ReconcileKnativeIstio) Reconcile(request reconcile.Request) (reconcile.
 
 	// Check if this Pod already exists
 	found := &corev1.Pod{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
 		err = r.client.Create(context.TODO(), pod)
