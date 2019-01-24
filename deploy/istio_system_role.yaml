@@ -61,7 +61,7 @@ rules:
   - config.istio.io
   resources:
   - '*'
-  - logentrys
+  - logentries
   - kubernetesenvs
   - prometheuses
   - attributemanifests

@@ -77,11 +77,15 @@ type ReconcileKnative struct {
 	scheme        *runtime.Scheme
 	dynamicClient dynamic.Interface
 
-	serving *yaml.ConfigFile
+	serving  *yaml.ConfigFile
+	build    *yaml.ConfigFile
+	eventing *yaml.ConfigFile
 }
 
 const (
-	SERVING_CONFIG_FILE_PATH = "/etc/config/knative/serving-v0.3.0.yaml"
+	SERVING_CONFIG_FILE_PATH  = "/etc/config/knative/serving-v0.3.0.yaml"
+	BUILD_CONFIG_FILE_PATH    = "/etc/config/knative/build-v0.3.0.yaml"
+	EVENTING_CONFIG_FILE_PATH = "/etc/config/knative/eventing-v0.3.0.yaml"
 )
 
 func (r *ReconcileKnative) InjectConfig(c *rest.Config) error {
@@ -98,9 +102,30 @@ func (r *ReconcileKnative) UpdateConfig() {
 		if err := r.serving.Read(); err != nil {
 			log.Error(err, "error reading config file %q", r.serving.Path)
 		}
+		logger := log.WithValues("Config", r.serving.Path)
+		logger.Info("Updated Serving Config", "ConfigMap.Knative.Resources", len(r.serving.Resources))
 	}
-	logger := log.WithValues("Config", r.serving.Path)
-	logger.Info("Updated Serving Config", "ConfigMap.Knative.Resources", len(r.serving.Resources))
+	if r.build == nil {
+		r.build = &yaml.ConfigFile{
+			Path: BUILD_CONFIG_FILE_PATH,
+		}
+		if err := r.build.Read(); err != nil {
+			log.Error(err, "error reading config file %q", r.build.Path)
+		}
+		logger := log.WithValues("Config", r.build.Path)
+		logger.Info("Updated Build Config", "ConfigMap.Knative.Resources", len(r.build.Resources))
+	}
+	if r.eventing == nil {
+		r.eventing = &yaml.ConfigFile{
+			Path: EVENTING_CONFIG_FILE_PATH,
+		}
+		if err := r.eventing.Read(); err != nil {
+			log.Error(err, "error reading config file", "Path", r.eventing.Path)
+		}
+		logger := log.WithValues("Config", r.eventing.Path)
+		logger.Info("Updated Eventing Config", "ConfigMap.Knative.Resources", len(r.eventing.Resources))
+	}
+
 }
 
 // Reconcile reads that state of the cluster for a Knative object and makes changes based on the state read
@@ -130,7 +155,18 @@ func (r *ReconcileKnative) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	r.UpdateConfig()
 	if err := yaml.ReconcileConfig(r.serving, request, r.dynamicClient); err != nil {
-		return reconcile.Result{}, err
+		//return reconcile.Result{}, err
+		reqLogger.Error(err, "Reconciling Knative Serving Failed")
+	}
+
+	if err := yaml.ReconcileConfig(r.eventing, request, r.dynamicClient); err != nil {
+		//return reconcile.Result{}, err
+		reqLogger.Error(err, "Reconciling Knative Eventing Failed")
+	}
+
+	if err := yaml.ReconcileConfig(r.build, request, r.dynamicClient); err != nil {
+		//return reconcile.Result{}, err
+		reqLogger.Error(err, "Reconciling Knative Build Failed")
 	}
 
 	// Define a new Pod object

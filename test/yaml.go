@@ -9,7 +9,7 @@ import (
 
 func main() {
 	cf := yaml.ConfigFile{
-		Path: "./yaml/serving-v0.3.0.yaml",
+		Path: "./yaml/eventing-v0.3.0.yaml",
 	}
 	if err := cf.Read(); err != nil {
 		fmt.Printf("Error: %v\n", err)

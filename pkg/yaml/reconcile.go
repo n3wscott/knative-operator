@@ -8,13 +8,15 @@ import (
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	"strings"
 )
 
 var log = logf.Log.WithName("helper_yaml")
 
 func ReconcileConfig(cf *ConfigFile, request reconcile.Request, dynamicClient dynamic.Interface) error {
-	logger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	logger.Info("Reconciling CRDs")
+	logger := log.WithValues("Path", cf.Path)
+
+	logger.Info("Reconciling...", "Resource.Count", len(cf.Resources))
 
 	for k, v := range cf.Resources {
 		logger.Info("inspecting resource", "Reconcile.Key", k)
@@ -48,6 +50,15 @@ func ReconcileConfig(cf *ConfigFile, request reconcile.Request, dynamicClient dy
 
 		gvr := duckapis.KindToResource(gvk)
 
+		// TODO: the pluralizeKind has some bugs (k8s has special cases) I am going to work around for the moment, here:
+
+		switch strings.ToLower(kind) {
+		case strings.ToLower("PodSecurityPolicy"):
+			gvr.Resource = "podsecuritypolicy"
+		case strings.ToLower("LogEntry"):
+			gvr.Resource = "logentries"
+		}
+
 		gvrClient := dynamicClient.Resource(gvr)
 
 		name := v.GetName()
@@ -68,7 +79,7 @@ func ReconcileConfig(cf *ConfigFile, request reconcile.Request, dynamicClient dy
 
 				_, err := gvrC.Create(&v, metav1.CreateOptions{})
 				if err != nil {
-					logger.Error(err, "failed to create")
+					logger.Error(err, "failed to create", "Key", k)
 				}
 
 			} else {

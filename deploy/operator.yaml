@@ -14,41 +14,44 @@ spec:
     spec:
       serviceAccountName: knative-operator
       containers:
-        - name: knative-operator
-          image: github.com/n3wscott/knative-operator/cmd/manager
-          ports:
-          - containerPort: 60000
-            name: metrics
-          imagePullPolicy: Always
-          env:
-            - name: WATCH_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: OPERATOR_NAME
-              value: "knative-operator"
-          volumeMounts:
-            - name: istio-crds-yaml-v0-3-0-volume
-              mountPath: /etc/config/istio
-            - name: knative-install-v0-3-0-yaml-volume
-              mountPath: /etc/config/knative
-      volumes:
+      - name: knative-operator
+        image: github.com/n3wscott/knative-operator/cmd/manager
+        ports:
+        - containerPort: 60000
+          name: metrics
+        imagePullPolicy: Always
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OPERATOR_NAME
+          value: "knative-operator"
+        volumeMounts:
         - name: istio-crds-yaml-v0-3-0-volume
-          configMap:
-            name: knative-istio-crds-yaml
-            items:
-              - key: istio-crds-v0.3.0.yaml
-                path: istio-crds-v0.3.0.yaml
-              - key: istio-v0.3.0.yaml
-                path: istio-v0.3.0.yaml
+          mountPath: /etc/config/istio
         - name: knative-install-v0-3-0-yaml-volume
-          configMap:
-            name: knative-install-yaml
-            items:
-              - key: serving-v0.3.0.yaml
-                path: serving-v0.3.0.yaml
-
+          mountPath: /etc/config/knative
+      volumes:
+      - name: istio-crds-yaml-v0-3-0-volume
+        configMap:
+          name: knative-istio-crds-yaml
+          items:
+          - key: istio-crds-v0.3.0.yaml
+            path: istio-crds-v0.3.0.yaml
+          - key: istio-v0.3.0.yaml
+            path: istio-v0.3.0.yaml
+      - name: knative-install-v0-3-0-yaml-volume
+        configMap:
+          name: knative-install-yaml
+          items:
+          - key: serving-v0.3.0.yaml
+            path: serving-v0.3.0.yaml
+          - key: build-v0.3.0.yaml
+            path: build-v0.3.0.yaml
+          - key: eventing-v0.3.0.yaml
+            path: eventing-v0.3.0.yaml

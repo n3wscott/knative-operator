@@ -74,6 +74,6 @@ func (c *ConfigFile) Store(u *unstructured.Unstructured) error {
 }
 
 func Key(u *unstructured.Unstructured) string {
-	kvn := fmt.Sprintf("%s%s/%s/%s", u.GetKind(), u.GetAPIVersion(), u.GetName(), u.GetNamespace())
+	kvn := fmt.Sprintf("%s/%s/%s/%s", u.GetKind(), u.GetAPIVersion(), u.GetName(), u.GetNamespace())
 	return kvn
 }
